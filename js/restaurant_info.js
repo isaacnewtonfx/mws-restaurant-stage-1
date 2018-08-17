@@ -22,7 +22,7 @@ initMap = () => {
         scrollWheelZoom: false
       });
       L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.jpg70?access_token={mapboxToken}', {
-        mapboxToken: '<your MAPBOX API KEY HERE>',
+        mapboxToken: 'pk.eyJ1IjoiaXNhYWNuZXd0b24iLCJhIjoiY2preTJoeTJyMGFuYzN3cDQ0Y2ppamFobCJ9.fzlfT9wqluy3ejxuGYXbAA',
         maxZoom: 18,
         attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, ' +
           '<a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
@@ -31,6 +31,11 @@ initMap = () => {
       }).addTo(newMap);
       fillBreadcrumb();
       DBHelper.mapMarkerForRestaurant(self.restaurant, self.newMap);
+  
+
+      // Now call function to attach tab control events to elements
+      attachTabControlEventsToElements();  
+  
     }
   });
 }  
@@ -84,13 +89,16 @@ fillRestaurantHTML = (restaurant = self.restaurant) => {
   name.innerHTML = restaurant.name;
 
   const address = document.getElementById('restaurant-address');
+  address.setAttribute("aria-label","restaurant address, " + restaurant.address);
   address.innerHTML = restaurant.address;
 
   const image = document.getElementById('restaurant-img');
   image.className = 'restaurant-img'
+  image.setAttribute("alt","");
   image.src = DBHelper.imageUrlForRestaurant(restaurant);
 
   const cuisine = document.getElementById('restaurant-cuisine');
+  cuisine.setAttribute("aria-label","restaurant cuisine, " + restaurant.cuisine_type);
   cuisine.innerHTML = restaurant.cuisine_type;
 
   // fill operating hours
@@ -108,7 +116,7 @@ fillRestaurantHoursHTML = (operatingHours = self.restaurant.operating_hours) => 
   const hours = document.getElementById('restaurant-hours');
   for (let key in operatingHours) {
     const row = document.createElement('tr');
-
+    
     const day = document.createElement('td');
     day.innerHTML = key;
     row.appendChild(day);
@@ -117,6 +125,24 @@ fillRestaurantHoursHTML = (operatingHours = self.restaurant.operating_hours) => 
     time.innerHTML = operatingHours[key];
     row.appendChild(time);
 
+    row_aria_label = "";
+    if(time.innerHTML.includes(",")){
+
+      _time_from =  time.innerHTML.split(",")[0];
+      _time_to =  time.innerHTML.split(",")[1];
+
+      time_from = " opening from " +  _time_from.split("-")[0] + " to" + _time_from.split("-")[1];
+      time_to = " and from" + _time_to.split("-")[0] + " to" + _time_to.split("-")[1];
+
+      row_aria_label = "on " + day.innerHTML + time_from + time_to;
+
+    }else{
+      time_from = " opening from " +  time.innerHTML.split("-")[0];
+      time_to = " to" + time.innerHTML.split("-")[1];
+      row_aria_label = "on " + day.innerHTML + time_from + time_to;
+    }
+
+    row.setAttribute("aria-label", row_aria_label);
     hours.appendChild(row);
   }
 }
@@ -128,6 +154,8 @@ fillReviewsHTML = (reviews = self.restaurant.reviews) => {
   const container = document.getElementById('reviews-container');
   const title = document.createElement('h2');
   title.innerHTML = 'Reviews';
+  title.setAttribute("tabindex","-1");
+  title.setAttribute("id","reviewsHeading");
   container.appendChild(title);
 
   if (!reviews) {
@@ -157,12 +185,19 @@ createReviewHTML = (review) => {
   li.appendChild(date);
 
   const rating = document.createElement('p');
+  rating.setAttribute("aria-label","review rating");
   rating.innerHTML = `Rating: ${review.rating}`;
   li.appendChild(rating);
 
   const comments = document.createElement('p');
   comments.innerHTML = review.comments;
   li.appendChild(comments);
+
+  li.setAttribute("tabindex",0);
+
+  li.setAttribute("aria-label", "reviewer name, " + review.name + 
+                  ", review date," + review.date + ",review rating," 
+                  + review.rating + ",review comment," + review.comments);
 
   return li;
 }
@@ -191,4 +226,59 @@ getParameterByName = (name, url) => {
   if (!results[2])
     return '';
   return decodeURIComponent(results[2].replace(/\+/g, ' '));
+}
+
+
+// This function will handle the order of the tab control for ARIA
+function attachTabControlEventsToElements(){
+
+  homeNav = document.getElementById("homeNav");
+  homeNav.addEventListener("keydown",function(e){
+    if(event.shiftKey && event.keyCode == 9) { 
+      //shift was down when tab was pressed
+      return
+    }else if(e.keyCode == 9){
+      e.preventDefault();
+      document.getElementById("restaurant-name").focus();
+    }
+  });
+  
+  restHoursTable = document.getElementById("restaurant-hours");
+  restHoursTable.addEventListener("keydown",function(e){
+    e.preventDefault();
+    document.getElementById("map-container2").focus();
+  });
+
+
+  mapZoomOutBtn = document.getElementsByClassName("leaflet-control-zoom-out")[0];
+  mapZoomOutBtn.addEventListener("keydown",function(e){
+    if(event.shiftKey && event.keyCode == 9) { 
+      //shift was down when tab was pressed
+      return
+    }else if(e.keyCode == 9){
+      e.preventDefault();
+      document.getElementById("reviewsHeading").focus();
+    }
+  });
+
+  reviewsHeading = document.getElementById("reviewsHeading");
+  reviewsHeading.addEventListener("keydown",function(e){
+    if(event.shiftKey && event.keyCode == 9) { 
+      //shift was down when tab was pressed
+      e.preventDefault();
+      document.getElementsByClassName("leaflet-control-zoom-out")[0].focus();
+    }
+  });
+
+  // reviewsUL = document.getElementById("reviews-list");
+  // reviewsUL.addEventListener("keydown",function(e){
+  //   if(event.shiftKey && event.keyCode == 9) { 
+  //     //shift was down when tab was pressed
+  //     e.preventDefault();
+  //     document.getElementById("reviewsHeading").focus();
+  //   }
+  // });
+
+
+
 }
