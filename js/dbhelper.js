@@ -8,27 +8,176 @@ class DBHelper {
    * Change this to restaurants.json file location on your server.
    */
   static get DATABASE_URL() {
-    const port = 8000 // Change this to your server port
-    return `http://localhost:${port}/data/restaurants.json`;
+    const port = 1337 // Change this to your server port
+    //return `http://localhost:${port}/data/restaurants.json`;
+    return `http://localhost:${port}/restaurants`;
   }
+
+
+  /**
+   * Save all restaurants to indexedDB.
+   */
+  static saveRestaurantsToDb(restaurants){
+
+    console.log("inside saving restaurants to db");
+
+    let IDBOpenRequest = window.indexedDB.open("AppDB", 1);
+    
+    IDBOpenRequest.onerror = function(event) {
+        console.log("IDBrequest Error")
+    };
+
+    IDBOpenRequest.onsuccess = function(event) {
+      
+      const db = event.target.result;
+      const restaurantObjectStore = db.transaction("Restaurants", "readwrite").objectStore("Restaurants");
+
+      restaurantObjectStore.transaction.oncomplete = function(event) {
+
+        // add data to the objectStore.
+        var restaurantObjectStore = db.transaction("Restaurants", "readwrite").objectStore("Restaurants");
+
+        // add restaurants to object store
+        for (var key in restaurants) {
+           restaurantObjectStore.add(restaurants[key]);
+        }
+ 
+      };
+
+
+    };
+
+
+    // IDBOpenRequest.onupgradeneeded = function(event) {
+
+    //   console.log("IDBrequest onupgradeneeded");
+
+    //   let db = event.target.result;
+    //   let objectStore = db.createObjectStore("Restaurants", { keyPath: "id" });
+    //   objectStore.createIndex("id", "id", { unique: true });
+
+
+    //   objectStore.transaction.oncomplete = function(event) {
+
+    //     // add data to the objectStore.
+    //     var restaurantObjectStore = db.transaction("Restaurants", "readwrite").objectStore("Restaurants");
+
+    //     // add restaurants to object store
+    //     for (var key in restaurants) {
+    //        restaurantObjectStore.add(restaurants[key]);
+    //     }
+ 
+    //   };
+
+    // }
+
+  }
+
+
+    /**
+   * Fetch all restaurants from indexedDB.
+   */
+  static loadRestaurantsFromDb(callback){
+
+      let IDBOpenRequest = window.indexedDB.open("AppDB", 1);
+      let restaurants = [];
+
+      IDBOpenRequest.onupgradeneeded = function(event) {
+  
+        let db = event.target.result;
+        let objectStore = db.createObjectStore("Restaurants", { keyPath: "id" });
+        objectStore.createIndex("id", "id", { unique: true });
+    
+      }
+
+
+      IDBOpenRequest.onerror = function(event) {
+          console.log("IDBrequest Error")
+      };
+
+      
+      IDBOpenRequest.onsuccess = function(event) {
+
+       // console.log("IDBrequest Success");
+
+        const db = event.target.result;
+
+        // handle error when Restaurants Object Store is not created yet
+        try {
+
+          const restaurantObjectStore = db.transaction("Restaurants", "readwrite").objectStore("Restaurants");
+          const getAllRequest = restaurantObjectStore.getAll();
+
+          getAllRequest.onsuccess = function(event) {
+            restaurants = event.target.result;
+  
+            //success
+            callback(null,restaurants);
+          };
+  
+          getAllRequest.onerror = function(event) {
+            const error = 'error loading restaurants from indexedDb';
+            callback(error,null);
+          };
+
+        } catch (error) {
+          console.log(error);  
+          callback(error,null); 
+        }
+
+    }
+
+    IDBOpenRequest.onerror = function(event) {
+      const error = 'error opening AppDB indexedDb';
+      callback(error,null);
+    };
+
+}
+
 
   /**
    * Fetch all restaurants.
    */
   static fetchRestaurants(callback) {
-    let xhr = new XMLHttpRequest();
-    xhr.open('GET', DBHelper.DATABASE_URL);
-    xhr.onload = () => {
-      if (xhr.status === 200) { // Got a success response from server!
-        const json = JSON.parse(xhr.responseText);
-        const restaurants = json.restaurants;
+
+    // First check if restaurants exists in indexedDb else fallback on online resource
+
+   this.loadRestaurantsFromDb( (error, restaurants) => {
+
+      if(restaurants && restaurants.length>0){
+
+        // loading restaurants from IndexedDb
+        console.log('loading restaurants from IndexedDb');
         callback(null, restaurants);
-      } else { // Oops!. Got an error from server.
-        const error = (`Request failed. Returned status of ${xhr.status}`);
-        callback(error, null);
+
+      }else{
+
+        // loading restaurants from Online
+        console.log('loading restaurants from Online');
+
+        let xhr = new XMLHttpRequest();
+        xhr.open('GET', DBHelper.DATABASE_URL);
+        xhr.onload = () => {
+          if (xhr.status === 200) { // Got a success response from server!
+            const json = JSON.parse(xhr.responseText);
+            //console.log(json);
+            //const restaurants = json.restaurants;
+    
+            // save restaurants to indexedDb
+            this.saveRestaurantsToDb(json);
+    
+            callback(null, json);
+          } else { // Oops!. Got an error from server.
+            const error = (`Request failed. Returned status of ${xhr.status}`);
+            callback(error, null);
+          }
+        };
+        xhr.send();
+        
       }
-    };
-    xhr.send();
+
+   });
+
   }
 
   /**
@@ -150,7 +299,7 @@ class DBHelper {
    * Restaurant image URL.
    */
   static imageUrlForRestaurant(restaurant) {
-    return (`/img/${restaurant.photograph}`);
+    return (`/img/${restaurant.photograph}.jpg`);
   }
 
   /**
