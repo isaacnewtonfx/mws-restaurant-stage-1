@@ -261,6 +261,8 @@ class DBHelper {
       if (error) {
         callback(error, null);
       } else {
+        console.log('checking the cause of error at reviewer end');
+        console.log(restaurants);
         // Get all neighborhoods from all restaurants
         const neighborhoods = restaurants.map((v, i) => restaurants[i].neighborhood)
         // Remove duplicates from neighborhoods
