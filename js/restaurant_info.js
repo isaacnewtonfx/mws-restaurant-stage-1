@@ -5,7 +5,14 @@ var newMap;
  * Initialize map as soon as the page is loaded.
  */
 document.addEventListener('DOMContentLoaded', (event) => {  
-  initMap();
+
+  // Create IndexedDb before anything else runs
+  DBHelper.createIndexedDb(function(){
+
+    initMap();
+
+  })
+
 });
 
 /**
@@ -150,7 +157,8 @@ fillRestaurantHoursHTML = (operatingHours = self.restaurant.operating_hours) => 
 /**
  * Create all reviews HTML and add them to the webpage.
  */
-fillReviewsHTML = (reviews = self.restaurant.reviews) => {
+fillReviewsHTML = () => {
+
   const container = document.getElementById('reviews-container');
   const title = document.createElement('h3');
   title.innerHTML = 'Reviews';
@@ -158,17 +166,53 @@ fillReviewsHTML = (reviews = self.restaurant.reviews) => {
   title.setAttribute("id","reviewsHeading");
   container.appendChild(title);
 
-  if (!reviews) {
+
+
+  const id = self.restaurant.id;  
+
+  fetch('http://localhost:1337/reviews/?restaurant_id=' + id)
+  .then(function(response) {
+    return response.json();
+  })
+  .then(function(reviewsJson) {
+    //console.log(JSON.stringify(reviewsJson));
+
+    if (!reviewsJson) {
+      const noReviews = document.createElement('p');
+      noReviews.innerHTML = 'No reviews yet!';
+      container.appendChild(noReviews);
+      return;
+    }
+
+
+    const ul = document.getElementById('reviews-list');
+    reviewsJson.forEach(review => {
+      ul.appendChild(createReviewHTML(review));
+    });
+    container.appendChild(ul);
+    
+
+
+    //Append deferred reviews to the page
+    DBHelper.loadDeferredReviewsByRestaurantId(id, function(error, deferredReviews){
+
+      deferredReviews.forEach(review => {
+        ul.appendChild(createReviewHTML(review));
+      });
+
+    });
+
+  })
+  .catch(error => {
+
+    // On error, show a friendly message
     const noReviews = document.createElement('p');
-    noReviews.innerHTML = 'No reviews yet!';
+    noReviews.innerHTML = 'A network problem occured fetching reviews';
     container.appendChild(noReviews);
-    return;
-  }
-  const ul = document.getElementById('reviews-list');
-  reviews.forEach(review => {
-    ul.appendChild(createReviewHTML(review));
+    
+    console.error(error)
   });
-  container.appendChild(ul);
+
 }
 
 /**
@@ -181,7 +225,8 @@ createReviewHTML = (review) => {
   li.appendChild(name);
 
   const date = document.createElement('p');
-  date.innerHTML = review.date;
+  friendlyDate = new Date(review.createdAt);
+  date.innerHTML = friendlyDate;
   li.appendChild(date);
 
   const rating = document.createElement('p');
@@ -280,5 +325,138 @@ function attachTabControlEventsToElements(){
   // });
 
 
+  btnAddReview = document.getElementById("btnAddReview");
+  btnAddReview.addEventListener("click",function(e){
+
+
+    let restaurant_id = self.restaurant.id;
+    let reviewer_name = document.getElementById('reviewer_name').value;
+    let reviewer_rating_elem = document.getElementById('reviewer_rating');
+    let reviewer_rating = reviewer_rating_elem.options[reviewer_rating_elem.selectedIndex].value;
+    let comment_text = document.getElementById('comment_text').value;
+
+    const status_elem = document.getElementById('status_msg');
+    
+    
+    if (comment_text == "" || reviewer_name == "") {
+      status_elem.innerHTML = "Sorry, all fields are required";
+      status_elem.style.display = "block";
+    }else{
+
+      // post the comment to the server
+      postData = {
+        restaurant_id : restaurant_id,
+        name: reviewer_name,
+        rating: reviewer_rating,
+        comments: comment_text      
+      }
+
+      fetch("http://localhost:1337/reviews/", 
+      { method: "POST", 
+        body: JSON.stringify(postData) 
+      })
+      .then(function(response){
+        return response.json();
+      })
+      .then(function(responseJson){
+        console.log(responseJson);
+
+        const ul = document.getElementById('reviews-list');
+        ul.appendChild(createReviewHTML(responseJson));
+
+        status_elem.innerHTML = "Your review has been added";
+        status_elem.style.display = "block";
+        status_elem.style.color = "green";
+
+      }).catch(e=>{
+
+        //Handle network error here and inform the user that they are offline
+        //console.log(e);
+
+        d = new Date();
+        postData.createdAt = d.getTime();
+        
+        //Save deferred review to IndexedDb
+        DBHelper.saveDeferredReviewToDb(postData);
+
+        //Todo: Use a WebWorker to check for network availability and resubmit the stored deferred reviews. 
+        //Delete them from local storage when successfully submitted
+        let worker = new Worker('js/worker.js');
+        worker.onmessage = (e) => { 
+          
+          if (e.data.isConnected){
+
+            //Terminate the worker here
+            worker.terminate();
+
+            // The connection is now established
+            console.log("The connection is now established!!!");
+
+            // Post all deferred reviews to the server
+            DBHelper.loadDeferredReviews(function(deferredReviews){
+
+              successfullyPosted = [];
+
+              deferredReviews.forEach(review => {
+
+                fetch("http://localhost:1337/reviews/", 
+                { method: "POST", 
+                  body: JSON.stringify(review) 
+                })
+                .then(function(response){
+                  return response.json();
+                })
+                .then(function(responseJson){
+
+                  successfullyPosted.push(responseJson.id);
+
+                  if (successfullyPosted.length == deferredReviews.length){
+                    
+                    //show status message to the user
+                    status_elem.innerHTML = "All your deferred reviews have been posted successfully";
+                    status_elem.style.display = "block";
+                    status_elem.style.color = "green";   
+
+                  }  
+                  
+
+                }).catch(e=>{
+                  console.log("An error occured posting deferred review");
+                });
+
+
+              });        
+        
+            });
+
+          }
+          
+        }
+        worker.addEventListener('error', (e) => { 
+          console.log("An error occured on the worker");
+          console.log(e);
+        })
+
+        
+        //append the deferred review to the reviews list
+        const ul = document.getElementById('reviews-list');
+        ul.appendChild(createReviewHTML(postData));
+
+        //show status message to the user
+        status_elem.innerHTML = "We realize you are offline. We will automatically post your review when you are back online";
+        status_elem.style.display = "block";
+        status_elem.style.color = "brown";
+      })
+
+    }
+
+
+    //Clear inputs
+    document.getElementById('reviewer_name').value = "";
+    document.getElementById('comment_text').value = "";
+    
+
+  });
 
 }
+

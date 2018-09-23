@@ -15,6 +15,45 @@ class DBHelper {
 
 
   /**
+   * Create IndexDB Database and Object Stores.
+   */
+  static createIndexedDb(callback){
+
+    let IDBOpenRequest = window.indexedDB.open("AppDB", 1);
+
+    IDBOpenRequest.onupgradeneeded = function(event) {
+
+      let db = event.target.result;
+
+      //Create Restaurants Object Store
+      let restaurantObjectStore = db.createObjectStore("Restaurants", { keyPath: "id" });
+      restaurantObjectStore.createIndex("id", "id", { unique: true });
+
+
+      //Create Deferred Reviews Object Store
+      let deferredReviewsObjectStore = db.createObjectStore("DeferredReviews", { keyPath: "id",autoIncrement:true });
+      deferredReviewsObjectStore.createIndex("id", "id", { unique: true });
+
+    }
+
+    IDBOpenRequest.onsuccess = function(event) {
+
+      //Call the callback when done
+      callback();
+    }
+
+    IDBOpenRequest.onerror = function(event) {
+      const error = 'error opening AppDB indexedDb';
+      callback(error,null);
+    };
+
+  }
+
+
+
+
+
+  /**
    * Save all restaurants to indexedDB.
    */
   static saveRestaurantsToDb(restaurants){
@@ -43,35 +82,137 @@ class DBHelper {
         }
  
       };
-
-
     };
 
-
-    // IDBOpenRequest.onupgradeneeded = function(event) {
-
-    //   console.log("IDBrequest onupgradeneeded");
-
-    //   let db = event.target.result;
-    //   let objectStore = db.createObjectStore("Restaurants", { keyPath: "id" });
-    //   objectStore.createIndex("id", "id", { unique: true });
+  }
 
 
-    //   objectStore.transaction.oncomplete = function(event) {
+  /**
+   * Save deferred reviews to indexedDB.
+   */
+  static saveDeferredReviewToDb(review){
 
-    //     // add data to the objectStore.
-    //     var restaurantObjectStore = db.transaction("Restaurants", "readwrite").objectStore("Restaurants");
+    console.log("inside saving deferred reviews to db");
 
-    //     // add restaurants to object store
-    //     for (var key in restaurants) {
-    //        restaurantObjectStore.add(restaurants[key]);
-    //     }
- 
-    //   };
+    let IDBOpenRequest = window.indexedDB.open("AppDB", 1);
+    
+    IDBOpenRequest.onerror = function(event) {
+        console.log("IDBrequest Error")
+    };
 
-    // }
+    IDBOpenRequest.onsuccess = function(event) {
+      
+      const db = event.target.result;
+      const deferredReviewsObjectStore = db.transaction("DeferredReviews", "readwrite").objectStore("DeferredReviews");
+
+      deferredReviewsObjectStore.transaction.oncomplete = function(event) {
+
+        // add data to the objectStore.
+        var deferredReviewsObjectStore = db.transaction("DeferredReviews", "readwrite").objectStore("DeferredReviews");
+
+        // add deferred review to object store
+        deferredReviewsObjectStore.add(review);
+        
+      };
+    };
 
   }
+
+
+/**
+   * Fetch deferred reviews by restaurant ID.
+   */
+  static loadDeferredReviewsByRestaurantId(restaurant_id, callback){
+
+    let IDBOpenRequest = window.indexedDB.open("AppDB", 1);
+    let reviews = [];
+
+    IDBOpenRequest.onsuccess = function(event) {
+      const db = event.target.result;
+
+
+      try {
+
+        const deferredReviewsObjectStore = db.transaction("DeferredReviews", "readwrite").objectStore("DeferredReviews");
+        const getAllRequest = deferredReviewsObjectStore.getAll();
+
+        getAllRequest.onsuccess = function(event) {
+
+          reviews = event.target.result;
+          const deferredReviews = reviews.filter(r => r.restaurant_id == restaurant_id);
+
+          //success
+          callback(null,deferredReviews);
+        };
+
+        getAllRequest.onerror = function(event) {
+          const error = 'error loading restaurants from indexedDb';
+          callback(error,null);
+        };
+
+      } catch (error) {
+        console.log(error);  
+        callback(error,null); 
+      }
+
+    }
+
+
+    IDBOpenRequest.onerror = function(event) {
+      const error = 'error opening AppDB indexedDb';
+      callback(error,null);
+    };
+
+  }
+
+
+
+
+/**
+   * Fetch deferred reviews
+   */
+  static loadDeferredReviews(callback){
+
+    let IDBOpenRequest = window.indexedDB.open("AppDB", 1);
+    let reviews = [];
+
+    IDBOpenRequest.onsuccess = function(event) {
+      const db = event.target.result;
+
+
+      try {
+
+        const deferredReviewsObjectStore = db.transaction("DeferredReviews", "readwrite").objectStore("DeferredReviews");
+        const getAllRequest = deferredReviewsObjectStore.getAll();
+
+        getAllRequest.onsuccess = function(event) {
+
+          reviews = event.target.result;
+
+          //success
+          callback(reviews);
+        };
+
+        getAllRequest.onerror = function(event) {
+          const error = 'error loading restaurants from indexedDb';
+          callback(error,null);
+        };
+
+      } catch (error) {
+        console.log(error);  
+        callback(error,null); 
+      }
+
+    }
+
+
+    IDBOpenRequest.onerror = function(event) {
+      const error = 'error opening AppDB indexedDb';
+      callback(error,null);
+    };
+
+  }
+
 
 
     /**
@@ -82,20 +223,7 @@ class DBHelper {
       let IDBOpenRequest = window.indexedDB.open("AppDB", 1);
       let restaurants = [];
 
-      IDBOpenRequest.onupgradeneeded = function(event) {
-  
-        let db = event.target.result;
-        let objectStore = db.createObjectStore("Restaurants", { keyPath: "id" });
-        objectStore.createIndex("id", "id", { unique: true });
-    
-      }
 
-
-      IDBOpenRequest.onerror = function(event) {
-          console.log("IDBrequest Error")
-      };
-
-      
       IDBOpenRequest.onsuccess = function(event) {
 
        // console.log("IDBrequest Success");
