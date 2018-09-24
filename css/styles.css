@@ -17,6 +17,7 @@ a {
 	color: orange;
 	text-decoration: none;
 }
+
 a:hover, a:focus {
 	color: #3397db;
 	text-decoration: none;
@@ -315,6 +316,17 @@ body {
 
 
 
+span.btn-fav{
+  color:gray;
+  font-size: 40px;
+  margin-left: 70px;
+} 
+
+span.btn-fav:hover{
+  cursor: pointer;
+}
+
+
   /* Media Query: reduce width of list item in order to show two columns */
   @media screen and (min-width:680px) and (max-width:759px){
     #restaurants-list li {
@@ -357,3 +369,5 @@ body {
   }
 
 }
+
+

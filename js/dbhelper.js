@@ -119,6 +119,46 @@ class DBHelper {
   }
 
 
+    /**
+   * Delete deferred reviews from indexedDB.
+   */
+  static deleteDeferredReviewFromDb(idArray){
+
+    console.log("inside delete deferred reviews from db");
+
+    let IDBOpenRequest = window.indexedDB.open("AppDB", 1);
+    
+    IDBOpenRequest.onerror = function(event) {
+        console.log("IDBrequest Error")
+    };
+
+    IDBOpenRequest.onsuccess = function(event) {
+      
+      const db = event.target.result;
+      const deferredReviewsObjectStore = db.transaction("DeferredReviews", "readwrite").objectStore("DeferredReviews");
+
+      deferredReviewsObjectStore.transaction.oncomplete = function(event) {
+
+        var deferredReviewsObjectStore = db.transaction("DeferredReviews", "readwrite").objectStore("DeferredReviews");
+
+        idArray.forEach(id => {
+          
+          var objectStoreRequest = deferredReviewsObjectStore.delete(id);
+
+          objectStoreRequest.onsuccess = function(event) {
+            // report the success of our request
+            console.log("deleted deferred review " + id)
+          };
+
+
+        });
+        
+        
+      };
+    };
+
+  }
+
 /**
    * Fetch deferred reviews by restaurant ID.
    */
@@ -130,8 +170,6 @@ class DBHelper {
     IDBOpenRequest.onsuccess = function(event) {
       const db = event.target.result;
 
-
-      try {
 
         const deferredReviewsObjectStore = db.transaction("DeferredReviews", "readwrite").objectStore("DeferredReviews");
         const getAllRequest = deferredReviewsObjectStore.getAll();
@@ -150,10 +188,6 @@ class DBHelper {
           callback(error,null);
         };
 
-      } catch (error) {
-        console.log(error);  
-        callback(error,null); 
-      }
 
     }
 
@@ -179,9 +213,6 @@ class DBHelper {
     IDBOpenRequest.onsuccess = function(event) {
       const db = event.target.result;
 
-
-      try {
-
         const deferredReviewsObjectStore = db.transaction("DeferredReviews", "readwrite").objectStore("DeferredReviews");
         const getAllRequest = deferredReviewsObjectStore.getAll();
 
@@ -197,11 +228,6 @@ class DBHelper {
           const error = 'error loading restaurants from indexedDb';
           callback(error,null);
         };
-
-      } catch (error) {
-        console.log(error);  
-        callback(error,null); 
-      }
 
     }
 
@@ -227,31 +253,21 @@ class DBHelper {
       IDBOpenRequest.onsuccess = function(event) {
 
        // console.log("IDBrequest Success");
-
         const db = event.target.result;
+        const restaurantObjectStore = db.transaction("Restaurants", "readwrite").objectStore("Restaurants");
+        const getAllRequest = restaurantObjectStore.getAll();
 
-        // handle error when Restaurants Object Store is not created yet
-        try {
+        getAllRequest.onsuccess = function(event) {
+          restaurants = event.target.result;
 
-          const restaurantObjectStore = db.transaction("Restaurants", "readwrite").objectStore("Restaurants");
-          const getAllRequest = restaurantObjectStore.getAll();
+          //success
+          callback(null,restaurants);
+        };
 
-          getAllRequest.onsuccess = function(event) {
-            restaurants = event.target.result;
-  
-            //success
-            callback(null,restaurants);
-          };
-  
-          getAllRequest.onerror = function(event) {
-            const error = 'error loading restaurants from indexedDb';
-            callback(error,null);
-          };
-
-        } catch (error) {
-          console.log(error);  
-          callback(error,null); 
-        }
+        getAllRequest.onerror = function(event) {
+          const error = 'error loading restaurants from indexedDb';
+          callback(error,null);
+        };
 
     }
 
@@ -326,6 +342,60 @@ class DBHelper {
       }
     });
   }
+
+
+  /**
+   * Update retaurant favorite status.
+   */
+  static updateRestaurantFavStatus(id, is_favorite){
+
+    let IDBOpenRequest = window.indexedDB.open("AppDB", 1);
+
+    IDBOpenRequest.onsuccess = function(event) {
+      const db = event.target.result;
+
+      const restaurantObjectStore = db.transaction("Restaurants", "readwrite").objectStore("Restaurants");
+      const getRequest = restaurantObjectStore.get(parseInt(id));
+
+        getRequest.onsuccess = function(event) {
+
+          // Get the old value that we want to update
+          var data = getRequest.result;
+          
+          // update the value(s) in the object that you want to change
+          data.is_favorite = is_favorite;
+
+          // Put this updated object back into the database.
+          var requestUpdate = restaurantObjectStore.put(data);
+          requestUpdate.onerror = function(event) {
+            // Do something with the error
+            console.log("An error occured updating restaurant");
+          };
+          requestUpdate.onsuccess = function(event) {
+            // Success - the data is updated!
+            console.log("Restaurant has been updated");
+
+          };
+
+        };
+
+        getRequest.onerror = function(event) {
+          const error = 'error loading restaurants from indexedDb';
+          callback(error,null);
+        };
+
+
+    }
+
+
+    IDBOpenRequest.onerror = function(event) {
+      const error = 'error opening AppDB indexedDb';
+      callback(error,null);
+    };
+
+  }
+
+
 
   /**
    * Fetch restaurants by a cuisine type with proper error handling.

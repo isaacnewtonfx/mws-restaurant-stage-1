@@ -395,7 +395,7 @@ function attachTabControlEventsToElements(){
             // Post all deferred reviews to the server
             DBHelper.loadDeferredReviews(function(deferredReviews){
 
-              successfullyPosted = [];
+              successfullyPostedIDs = [];
 
               deferredReviews.forEach(review => {
 
@@ -408,16 +408,18 @@ function attachTabControlEventsToElements(){
                 })
                 .then(function(responseJson){
 
-                  successfullyPosted.push(responseJson.id);
+                  successfullyPostedIDs.push(responseJson.id);
 
-                  if (successfullyPosted.length == deferredReviews.length){
+                  if (successfullyPostedIDs.length == deferredReviews.length){
                     
                     //show status message to the user
                     status_elem.innerHTML = "All your deferred reviews have been posted successfully";
                     status_elem.style.display = "block";
                     status_elem.style.color = "green";   
 
-                  }  
+                  }
+                  
+                  DBHelper.deleteDeferredReviewFromDb(successfullyPostedIDs);
                   
 
                 }).catch(e=>{

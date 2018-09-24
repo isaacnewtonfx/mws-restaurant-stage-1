@@ -189,6 +189,57 @@ createRestaurantHTML = (restaurant) => {
   more.href = DBHelper.urlForRestaurant(restaurant);
   li.append(more)
 
+  const fav = document.createElement('span');
+  fav.setAttribute("class", "btn-fav");
+  fav.innerHTML = '&#9733;';
+  fav.setAttribute("aria-label", "Mark as favorite");
+  fav.setAttribute("data-restaurant_id", restaurant.id);
+  fav.setAttribute("data-is_favorite", restaurant.is_favorite);
+  
+  if(restaurant.is_favorite){
+    fav.style.color = "green";        
+  }else{
+    fav.style.color = "gray";
+  }
+
+  // Click event to set favorite status of restaurant
+  fav.addEventListener("click", function(e){
+    
+    restaurant_id = fav.getAttribute("data-restaurant_id");
+    fav_status = fav.getAttribute("data-is_favorite");
+    toggle_fav_status = fav_status == "true" ? "false" : "true";
+
+    //Ajax request
+    fetch("http://localhost:1337/restaurants/"+ restaurant.id +"/?is_favorite=" + toggle_fav_status, 
+    { method: "PUT" })
+    .then(function(response){
+      return response.json();
+    })
+    .then(function(responseJson){
+
+      fav.setAttribute("data-is_favorite", responseJson.is_favorite);
+
+      //Update status color
+      if(responseJson.is_favorite == "true"){
+
+        fav.style.color = "green";  
+        DBHelper.updateRestaurantFavStatus(restaurant_id, true);
+        
+      }else{
+        fav.style.color = "gray";
+        DBHelper.updateRestaurantFavStatus(restaurant_id, false);
+
+      }
+
+
+    }).catch(e=>{
+      console.log("An error occured posting fav restaurant");
+    });
+
+  });
+
+  li.append(fav)
+
   return li
 }
 
